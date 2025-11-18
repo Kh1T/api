@@ -1,0 +1,248 @@
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { pool } from "./db.js";
+import multer from "multer";
+import path from "path";
+
+// Storage config for each type
+const imgBasePath = path.join(process.cwd(), "../aeoncommerce/public/img");
+
+const brandStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, path.join(imgBasePath, "brand")),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname)
+});
+const categoryStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, path.join(imgBasePath, "category")),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname)
+});
+const productStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, path.join(imgBasePath, "product")),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname)
+});
+
+const uploadBrand = multer({ storage: brandStorage });
+const uploadCategory = multer({ storage: categoryStorage });
+const uploadProduct = multer({ storage: productStorage });
+
+
+dotenv.config();
+const app = express();
+
+app.use(cors());            // អនុញ្ញាតឲ្យ frontend call api
+app.use(express.json());    // អាន JSON body
+
+// ------------------------
+// READ: List all brands
+// ------------------------
+
+app.get("/api/brands", async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT id, name, img FROM brands ORDER BY id DESC");
+    res.json(rows);   // ផ្ញើ JSON ទៅ frontend
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ------------------------
+// CREATE: Add a new brand
+// ------------------------
+app.post("/api/brands", uploadBrand.single("img"), async (req, res) => {
+  const { name } = req.body;
+  const imgPath = req.file ? `./img/brand/${req.file.filename}` : req.body.img || "";
+  if (!name) return res.status(400).json({ error: "Missing required fields" });
+  try {
+    const [result] = await pool.query(
+      "INSERT INTO brands (name, img) VALUES (?, ?)",
+      [name, imgPath]
+    );
+    res.json({ id: result.insertId, name, img: imgPath });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ------------------------
+// UPDATE: Update a brand
+// ------------------------
+app.put("/api/brands/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, img } = req.body;
+  try {
+    const [result] = await pool.query(
+      "UPDATE brands SET name=?, img=? WHERE id=?",
+      [name, img, id]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Brand not found" });
+    }
+    res.json({ id, name, img });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ------------------------
+// DELETE: Delete a brand
+// ------------------------
+app.delete("/api/brands/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [result] = await pool.query("DELETE FROM brands WHERE id=?", [id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Brand not found" });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ------------------------
+// READ: List all categories
+// ------------------------
+
+app.get("/api/categories", async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT id, name, img FROM categories ORDER BY id DESC");
+    res.json(rows);   // ផ្ញើ JSON ទៅ frontend
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+// ------------------------
+// CREATE: Add a new category
+// ------------------------
+app.post("/api/categories", uploadCategory.single("img"), async (req, res) => {
+  const { name } = req.body;
+  const imgPath = req.file ? `./img/category/${req.file.filename}` : req.body.img || "";
+  if (!name) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+  try {
+    const [result] = await pool.query(
+      "INSERT INTO categories (name, img) VALUES (?, ?)",
+      [name, imgPath]
+    );
+    res.json({ id: result.insertId, name, img: imgPath });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// UPDATE: Update a category (with image upload)
+app.put("/api/categories/:id", uploadCategory.single("img"), async (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
+  const imgPath = req.file ? `./img/category/${req.file.filename}` : req.body.img || "";
+  try {
+    const [result] = await pool.query(
+      "UPDATE categories SET name=?, img=? WHERE id=?",
+      [name, imgPath, id]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Category not found" });
+    }
+    res.json({ id, name, img: imgPath });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ------------------------
+// DELETE: Delete a category
+// ------------------------
+app.delete("/api/categories/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [result] = await pool.query("DELETE FROM categories WHERE id=?", [id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Category not found" });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ------------------------
+// READ: List all Product
+// ------------------------
+
+app.get("/api/product", async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT id, name, img, price, category_id FROM products ORDER BY id DESC");
+    res.json(rows);   // ផ្ញើ JSON ទៅ frontend
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }  
+
+  // ------------------------
+  // CREATE: Add a new product
+  // ------------------------
+  app.post("/api/product", uploadProduct.single("img"), async (req, res) => {
+  const { name, price, category_id } = req.body;
+  const imgPath = req.file ? `./img/product/${req.file.filename}` : req.body.img || "";
+  if (!name || !price || !category_id) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+  try {
+    const [result] = await pool.query(
+      "INSERT INTO products (name, img, price, category_id) VALUES (?, ?, ?, ?)",
+      [name, imgPath, price, category_id]
+    );
+    res.json({ id: result.insertId, name, img: imgPath, price, category_id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+  
+  // ------------------------
+  // UPDATE: Update a product
+  // ------------------------
+  app.put("/api/product/:id", uploadProduct.single("img"), async (req, res) => {
+  const { id } = req.params;
+  const { name, price, category_id } = req.body;
+  const imgPath = req.file ? `./img/product/${req.file.filename}` : req.body.img || "";
+  try {
+    const [result] = await pool.query(
+      "UPDATE products SET name=?, img=?, price=?, category_id=? WHERE id=?",
+      [name, imgPath, price, category_id, id]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+    res.json({ id, name, img: imgPath, price, category_id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+  
+  // ------------------------
+  // DELETE: Delete a product
+  // ------------------------
+  app.delete("/api/product/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+      const [result] = await pool.query("DELETE FROM products WHERE id=?", [id]);
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  
+});
+
+
+
+// ------------------------
+// Run server
+// ------------------------
+
+const PORT = process.env.PORT || 4000;
+// console.log (process.env.DB_PORT);
+app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
