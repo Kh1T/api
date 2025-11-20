@@ -176,7 +176,8 @@ app.get("/api/product", async (req, res) => {
     res.json(rows);   // ផ្ញើ JSON ទៅ frontend
   } catch (err) {
     res.status(500).json({ error: err.message });
-  }  
+  }
+});
 
   // ------------------------
   // CREATE: Add a new product
@@ -234,7 +235,23 @@ app.get("/api/product", async (req, res) => {
       res.status(500).json({ error: err.message });
     }
   });
+
+// Add search product API endpoint
+app.get("/api/product/search", async (req, res) => {
+  const { q } = req.query;
+  if (!q) {
+    return res.status(400).json({ error: "Query parameter 'q' is required" });
+  }
   
+  try {
+    const [rows] = await pool.query(
+      "SELECT id, name, img, price, category_id FROM products WHERE name LIKE ? ORDER BY id DESC",
+      [`%${q}%`]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 
